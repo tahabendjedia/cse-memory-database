@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { LEVELS, placeholderArt } from "@/lib/data";
 
+const LOOK_SECONDS = 5;
+
 const shuffle = (len) => {
   let a;
   do {
@@ -19,30 +21,41 @@ export default function Puzzle({ folder, level, onLevels, onFolders }) {
   const [img, setImg] = useState(null);
   const [placeholder, setPlaceholder] = useState(false);
   const [order, setOrder] = useState(null); // order[slot] = piece id
+  const [phase, setPhase] = useState("look"); // "look" = memorize, "play" = solve
+  const [left, setLeft] = useState(LOOK_SECONDS);
   const [sel, setSel] = useState(null);
   const [moves, setMoves] = useState(0);
   const [secs, setSecs] = useState(0);
   const [peek, setPeek] = useState(false);
   const dragFrom = useRef(null);
 
+  // Load a photo (works with folder.photo or folder.photos)
   useEffect(() => {
-  let cancelled = false;
-  const candidates = [...folder.photos].sort(() => Math.random() - 0.5);
-  const tryNext = () => {
-    const src = candidates.shift();
-    if (!src) { setPlaceholder(true); setImg(placeholderArt(folder)); return; }
-    const im = new Image();
-    im.onload = () => !cancelled && setImg(src);
-    im.onerror = () => !cancelled && tryNext();
-    im.src = src;
-  };
-  tryNext();
-  setOrder(shuffle(N * N));
-  return () => { cancelled = true; };
-}, [folder, N]);
+    let cancelled = false;
+    const candidates = [...(folder.photos ?? [folder.photo])].sort(() => Math.random() - 0.5);
+    const tryNext = () => {
+      const src = candidates.shift();
+      if (!src) { setPlaceholder(true); setImg(placeholderArt(folder)); return; }
+      const im = new Image();
+      im.onload = () => !cancelled && setImg(src);
+      im.onerror = () => !cancelled && tryNext();
+      im.src = src;
+    };
+    tryNext();
+    setOrder(shuffle(N * N));
+    return () => { cancelled = true; };
+  }, [folder, N]);
 
-  const solved = !!order && order.every((v, i) => v === i);
-  const running = !!order && !solved && moves > 0;
+  // Countdown while the full photo is shown
+  useEffect(() => {
+    if (phase !== "look" || !img) return;
+    if (left <= 0) { setPhase("play"); return; }
+    const t = setTimeout(() => setLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [phase, left, img]);
+
+  const solved = phase === "play" && !!order && order.every((v, i) => v === i);
+  const running = phase === "play" && !solved && moves > 0;
 
   useEffect(() => {
     if (!running) return;
@@ -57,10 +70,26 @@ export default function Puzzle({ folder, level, onLevels, onFolders }) {
     setSel(null);
   };
   const click = (i) => (sel === null ? setSel(i) : sel === i ? setSel(null) : swap(sel, i));
-  const restart = () => { setOrder(shuffle(N * N)); setMoves(0); setSecs(0); setSel(null); };
+  const reshuffle = () => { setOrder(shuffle(N * N)); setMoves(0); setSecs(0); setSel(null); };
+  const playAgain = () => { reshuffle(); setLeft(LOOK_SECONDS); setPhase("look"); };
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   if (!order || !img) return <p className="loading">Opening {folder.label}…</p>;
+
+  if (phase === "look") {
+    return (
+      <div className="play">
+        <p className="tip"><b>Memorize this photo.</b> It gets scrambled when the timer ends.</p>
+        <div className="board single">
+          <div className="peek" style={{ backgroundImage: `url("${img}")` }} />
+          <div className="look-bar">
+            <span>Scrambling in <b>{left}</b></span>
+            <button className="btn small" onClick={() => setPhase("play")}>I'm ready</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="play">
@@ -68,7 +97,7 @@ export default function Puzzle({ folder, level, onLevels, onFolders }) {
         <span>Moves <b>{moves}</b></span>
         <span>Time <b>{fmt(secs)}</b></span>
         <button className="btn small" onMouseDown={() => setPeek(true)} onMouseUp={() => setPeek(false)} onMouseLeave={() => setPeek(false)} onTouchStart={() => setPeek(true)} onTouchEnd={() => setPeek(false)}>Hold to preview</button>
-        <button className="btn small" onClick={restart}>Shuffle again</button>
+        <button className="btn small" onClick={reshuffle}>Shuffle again</button>
       </div>
 
       <div className="board" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
@@ -95,14 +124,14 @@ export default function Puzzle({ folder, level, onLevels, onFolders }) {
             <h2>Memory restored</h2>
             <p>{folder.label} · {LEVELS[level].label} · {moves} moves · {fmt(secs)}</p>
             <div className="row">
-              <button className="btn small" onClick={restart}>Play again</button>
+              <button className="btn small" onClick={playAgain}>Play again</button>
               <button className="btn small" onClick={onLevels}>Change difficulty</button>
               <button className="btn small" onClick={onFolders}>Other folders</button>
             </div>
           </div>
         )}
       </div>
-      <p className="tip">Click two pieces to swap them, or drag one onto another.{placeholder && ` Showing a placeholder: add public/photos/${folder.id}.jpg.`}</p>
+      <p className="tip">Click two pieces to swap them, or drag one onto another.{placeholder && ` Showing a placeholder: add a photo for ${folder.id} in public/photos/.`}</p>
     </div>
   );
 }

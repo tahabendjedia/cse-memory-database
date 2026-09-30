@@ -42,3 +42,5 @@ h2{margin:0}
 .b0{left:6%;width:90px;height:90px}.b1{left:22%;width:40px;height:40px;animation-delay:-6s}.b2{left:45%;width:120px;height:120px;animation-delay:-12s}.b3{left:63%;width:55px;height:55px;animation-delay:-3s}.b4{left:80%;width:100px;height:100px;animation-delay:-16s}.b5{left:92%;width:35px;height:35px;animation-delay:-9s}
 @keyframes rise{to{transform:translateY(-120vh)}}
 @media (prefers-reduced-motion:reduce){.bubble{animation:none;bottom:20%}.piece,.folder{transition:none}}
+.board.single{display:block}
+.look-bar{position:absolute;left:14px;right:14px;bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px 6px 16px;border-radius:999px;background:rgba(255,255,255,.88);border:1px solid #9fd6f5}
